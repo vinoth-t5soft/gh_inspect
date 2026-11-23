@@ -1,0 +1,989 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GitHub Access Graph</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --hover: rgba(11,11,11,0.05);
+  --repo: #2a78d6;
+  --user: #eb6834;
+  --team: #1baf7a;
+  --accent: #2a78d6;
+  --critical: #d03b3b;
+  --shadow: 0 8px 24px rgba(11,11,11,0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255,255,255,0.10);
+    --hover: rgba(255,255,255,0.06);
+    --repo: #3987e5;
+    --user: #d95926;
+    --team: #199e70;
+    --accent: #3987e5;
+    --shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #f0efec;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255,255,255,0.10);
+  --hover: rgba(255,255,255,0.06);
+  --repo: #3987e5;
+  --user: #d95926;
+  --team: #199e70;
+  --accent: #3987e5;
+  --shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.wrap { max-width: 1600px; margin: 0 auto; padding: 20px 16px 40px; }
+header h1 { font-size: 20px; margin: 0 0 2px; font-weight: 650; letter-spacing: -0.01em; }
+header .meta { color: var(--ink-2); font-size: 13px; }
+.notice { margin-top: 10px; font-size: 13px; color: var(--ink-2); }
+.notice summary { cursor: pointer; }
+.notice ul { margin: 6px 0 0; padding-left: 18px; max-height: 160px; overflow: auto; }
+
+/* Filters */
+.filters {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin: 16px 0 12px;
+  position: sticky; top: 0; z-index: 20;
+  background: var(--page); padding: 8px 0;
+}
+.search {
+  flex: 1 1 220px; max-width: 320px; min-width: 0;
+  height: 34px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); color: var(--ink); font: inherit;
+}
+.search:focus, .btn:focus-visible, .dd summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dd { position: relative; }
+.dd summary, .btn {
+  list-style: none; cursor: pointer; user-select: none;
+  height: 34px; display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); color: var(--ink); font: inherit; white-space: nowrap;
+}
+.dd summary::-webkit-details-marker { display: none; }
+.dd summary::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(45deg) translateY(-2px); margin-left: 2px; }
+.dd summary:hover, .btn:hover { background: var(--hover); }
+.dd .k { color: var(--ink-2); }
+.dd .v { font-weight: 600; }
+.dd.active summary { border-color: var(--accent); }
+.dd-menu {
+  position: absolute; top: 40px; left: 0; min-width: 240px; max-height: 360px; overflow: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: var(--shadow); padding: 6px; z-index: 30;
+}
+.dd-menu .row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.dd-menu .row:hover { background: var(--hover); }
+.dd-menu .row .n { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+.dd-menu .row .hint { color: var(--muted); font-size: 12px; }
+.dd-menu .quick { display: flex; gap: 6px; padding: 4px 4px 8px; border-bottom: 1px solid var(--grid); margin-bottom: 4px; }
+.dd-menu .quick button { font: inherit; font-size: 12px; background: none; border: 0; color: var(--accent); cursor: pointer; padding: 2px 4px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 6px 0 12px;
+  border-radius: 8px; background: var(--hover); border: 1px solid var(--accent); font-size: 13px;
+}
+.chip button { border: 0; background: none; color: var(--ink-2); cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 6px; }
+.spacer { flex: 1 0 0; }
+
+/* Stats */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.stat .l { color: var(--ink-2); font-size: 12px; }
+.stat .n { font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
+
+/* Main */
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.graph { position: relative; height: min(72vh, 820px); min-height: 420px; overflow: hidden; }
+.graph canvas { display: block; width: 100%; height: 100%; max-width: 100%; cursor: grab; touch-action: none; }
+.graph canvas.dragging { cursor: grabbing; }
+.graph canvas.over { cursor: pointer; }
+.legend {
+  position: absolute; left: 10px; bottom: 10px; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center;
+  background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 10px; font-size: 12px; color: var(--ink-2); max-width: calc(100% - 20px);
+}
+.legend .it { display: inline-flex; align-items: center; gap: 6px; }
+.legend svg { display: block; }
+.tools { position: absolute; right: 10px; top: 10px; display: flex; gap: 6px; }
+.tools .btn { height: 30px; padding: 0 10px; font-size: 13px; }
+.empty { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; color: var(--ink-2); }
+.tooltip {
+  position: fixed; pointer-events: none; z-index: 50; display: none;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow);
+  padding: 8px 10px; font-size: 12px; max-width: 320px;
+}
+.tooltip .t { font-weight: 650; font-size: 13px; color: var(--ink); word-break: break-all; }
+.tooltip .s { color: var(--ink-2); }
+.tooltip .r { display: flex; gap: 10px; justify-content: space-between; }
+.tooltip .r b { font-variant-numeric: tabular-nums; color: var(--ink); }
+
+/* Side panel */
+.panel { padding: 14px; overflow: auto; height: min(72vh, 820px); min-height: 420px; }
+.panel h2 { font-size: 15px; margin: 0 0 4px; word-break: break-all; }
+.panel .sub { color: var(--ink-2); font-size: 12px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.panel .tag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); font-size: 12px; color: var(--ink-2); }
+.panel .actions { display: flex; gap: 6px; margin: 8px 0 12px; flex-wrap: wrap; }
+.panel .actions .btn { height: 30px; font-size: 13px; }
+.panel .actions a.btn { text-decoration: none; }
+.panel h3 { font-size: 12px; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.04em; margin: 14px 0 6px; font-weight: 600; }
+.conn { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.conn:hover { background: var(--hover); }
+.conn .who { font-weight: 550; word-break: break-all; display: flex; align-items: center; gap: 6px; }
+.conn .role { font-weight: 600; font-variant-numeric: tabular-nums; }
+.conn .via { grid-column: 1 / -1; color: var(--ink-2); font-size: 12px; word-break: break-word; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.panel .placeholder { color: var(--ink-2); }
+.panel .placeholder p { margin: 0 0 10px; }
+
+/* Table */
+.tablecard { margin-top: 12px; }
+.tablehead { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--grid); flex-wrap: wrap; }
+.tablehead h2 { font-size: 15px; margin: 0; }
+.tablehead .s { color: var(--ink-2); font-size: 13px; }
+.tablescroll { overflow: auto; max-height: 520px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 7px 14px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+th { position: sticky; top: 0; background: var(--surface); color: var(--ink-2); font-weight: 600; font-size: 12px; cursor: pointer; white-space: nowrap; }
+td.mono, td.role { font-variant-numeric: tabular-nums; }
+td.role { font-weight: 600; }
+tbody tr:hover { background: var(--hover); }
+
+@media (max-width: 980px) {
+  .main { grid-template-columns: minmax(0, 1fr); }
+  .panel { height: auto; min-height: 0; max-height: 60vh; }
+  .graph { height: 62vh; min-height: 360px; }
+}
+@media (max-width: 560px) {
+  .search { max-width: none; flex-basis: 100%; }
+  .dd-menu { position: fixed; left: 16px; right: 16px; top: auto; min-width: 0; }
+  th, td { padding: 6px 10px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>GitHub Access Graph</h1>
+    <div class="meta" id="meta"></div>
+    <div id="notices"></div>
+  </header>
+
+  <div class="filters" id="filters">
+    <input class="search" id="q" type="search" placeholder="Search users, repos, teams…" autocomplete="off" aria-label="Search">
+    <details class="dd" data-key="owners"><summary><span class="k">Owner</span><span class="v">All</span></summary><div class="dd-menu"></div></details>
+    <details class="dd" data-key="vis"><summary><span class="k">Visibility</span><span class="v">All</span></summary><div class="dd-menu"></div></details>
+    <details class="dd" data-key="roles"><summary><span class="k">Role</span><span class="v">All</span></summary><div class="dd-menu"></div></details>
+    <details class="dd" data-key="via"><summary><span class="k">Access via</span><span class="v">All</span></summary><div class="dd-menu"></div></details>
+    <details class="dd" data-key="show"><summary><span class="k">Show</span><span class="v"></span></summary><div class="dd-menu"></div></details>
+    <span id="isochip"></span>
+    <span class="spacer"></span>
+    <button class="btn" id="reset" type="button">Reset filters</button>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="main">
+    <div class="card graph" id="graph">
+      <canvas id="cv" aria-label="Network graph of repositories, users and teams. Use the table below for an accessible view."></canvas>
+      <div class="tools">
+        <button class="btn" id="zin" type="button" aria-label="Zoom in">+</button>
+        <button class="btn" id="zout" type="button" aria-label="Zoom out">−</button>
+        <button class="btn" id="fit" type="button">Fit</button>
+        <button class="btn" id="relayout" type="button">Re-layout</button>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="empty" id="empty">No access matches these filters.</div>
+    </div>
+    <aside class="card panel" id="panel"></aside>
+  </div>
+
+  <section class="card tablecard">
+    <div class="tablehead">
+      <h2>Access list</h2><span class="s" id="tcount"></span>
+      <span class="spacer"></span>
+      <button class="btn" id="csv" type="button">Download CSV</button>
+    </div>
+    <div class="tablescroll">
+      <table>
+        <thead><tr>
+          <th data-sort="repo">Repository</th><th data-sort="principal">Principal</th><th data-sort="ptype">Type</th>
+          <th data-sort="role">Role</th><th data-sort="via">Access via</th><th data-sort="vis">Visibility</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+<div class="tooltip" id="tip"></div>
+
+<script id="gh-data" type="application/json">__GH_INSPECT_DATA__</script>
+<script>
+(() => {
+"use strict";
+const DATA = JSON.parse(document.getElementById("gh-data").textContent);
+const $ = (s, el = document) => el.querySelector(s);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+// ---------- vocabulary ----------
+const ROLE_ORDER = ["admin", "maintain", "write", "triage", "read"];
+const roleKey = r => ROLE_ORDER.includes(r) ? r : "custom";
+const roleRank = r => { const i = ROLE_ORDER.indexOf(r); return i < 0 ? 2.5 : i; };
+// Edge weight (screen px) and ink opacity encode role: admin heaviest.
+const ROLE_STYLE = { admin: [2.6, 0.80], maintain: [2.1, 0.62], write: [1.6, 0.48], custom: [1.6, 0.48], triage: [1.2, 0.36], read: [0.9, 0.26] };
+const VIA_ORDER = ["owner", "direct", "outside-collaborator", "team", "org-owner", "org-base-permission", "team-or-org", "pending-invite"];
+const VIA_LABEL = {
+  "owner": ["Repo owner", "owner of a personal repo"],
+  "direct": ["Direct collaborator", "added to the repo directly"],
+  "outside-collaborator": ["Outside collaborator", "not an org member"],
+  "team": ["Team", "membership of a team with access"],
+  "org-owner": ["Org owner", "implicit admin on every repo"],
+  "org-base-permission": ["Org base permission", "default member access"],
+  "team-or-org": ["Team or org (unresolved)", "run with --expand-teams"],
+  "pending-invite": ["Pending invitation", "invited, not yet accepted"],
+};
+const viaKey = s => s.startsWith("team:") ? "team" : s;
+
+// ---------- build graph model ----------
+const nodes = new Map();
+const edges = [];
+const owners = new Map(), visCounts = new Map(), roleCounts = new Map(), viaCounts = new Map();
+const bump = (m, k) => m.set(k, (m.get(k) || 0) + 1);
+let webBase = "https://github.com";
+
+function getNode(id, kind, label, extra) {
+  let n = nodes.get(id);
+  if (!n) {
+    n = { id, kind, label, lower: label.toLowerCase(), x: NaN, y: NaN, vx: 0, vy: 0, fx: null, fy: null, deg: 0, ...extra };
+    nodes.set(id, n);
+  }
+  return n;
+}
+
+const repoErrors = [];
+for (const r of DATA.repos || []) {
+  if (r.url) { try { webBase = new URL(r.url).origin; } catch (_) {} }
+  bump(owners, r.owner); bump(visCounts, r.visibility || "unknown");
+  const rn = getNode("r:" + r.full_name.toLowerCase(), "repo", r.full_name, { repo: r });
+  if (r.errors && r.errors.length) repoErrors.push(r);
+  for (const c of r.collaborators || []) {
+    const un = getNode("u:" + c.login.toLowerCase(), "user", c.login, { utype: c.type });
+    if (c.type) un.utype = c.type;
+    const vk = new Set((c.sources || []).map(viaKey));
+    if (vk.has("outside-collaborator")) un.outside = true;
+    un.hasAccess = true;
+    edges.push({ s: un, t: rn, kind: "access", role: c.role, via: c.sources || [], vk, repo: r });
+    bump(roleCounts, roleKey(c.role)); vk.forEach(k => bump(viaCounts, k));
+  }
+  for (const t of r.teams || []) {
+    const tn = getNode("t:" + (r.owner + "/" + t.slug).toLowerCase(), "team", r.owner + "/" + t.slug, { org: r.owner, team: t });
+    edges.push({ s: tn, t: rn, kind: "team", role: t.role, via: ["team"], vk: new Set(["team"]), repo: r });
+    for (const m of t.members || []) {
+      const key = "m:" + m.toLowerCase() + "|" + tn.id;
+      if (!tn.memberKeys) tn.memberKeys = new Set();
+      if (tn.memberKeys.has(key)) continue;
+      tn.memberKeys.add(key);
+      const un = getNode("u:" + m.toLowerCase(), "user", m, { utype: "User" });
+      edges.push({ s: un, t: tn, kind: "member", role: null, via: [], vk: new Set() });
+    }
+  }
+  for (const iv of r.pending_invitations || []) {
+    if (!iv.login) continue;
+    const un = getNode("u:" + iv.login.toLowerCase(), "user", iv.login, { utype: "User" });
+    un.invited = true;
+    const via = ["pending-invite" + (iv.invited_by ? " by " + iv.invited_by : "") + (iv.expired ? " (expired)" : "")];
+    edges.push({ s: un, t: rn, kind: "invite", role: iv.role, via, vk: new Set(["pending-invite"]), repo: r });
+    bump(roleCounts, roleKey(iv.role)); bump(viaCounts, "pending-invite");
+  }
+}
+const hasTeams = edges.some(e => e.kind === "team");
+const hasInvites = edges.some(e => e.kind === "invite");
+const hasArchived = (DATA.repos || []).some(r => r.archived);
+const hasBots = [...nodes.values()].some(n => n.utype === "Bot");
+
+// ---------- header ----------
+{
+  const parts = [];
+  if (DATA.generated_at) parts.push("Generated " + new Date(DATA.generated_at).toLocaleString());
+  if (DATA.authenticated_as) parts.push("as " + DATA.authenticated_as);
+  const scope = [...(DATA.orgs || []).map(o => "org " + o), ...(DATA.users || []).map(u => "user " + u)];
+  if (scope.length) parts.push("scope: " + scope.join(", "));
+  $("#meta").textContent = parts.join(" · ");
+  const notes = $("#notices");
+  const addNote = (title, items) => {
+    const d = el("details", "notice"); d.appendChild(el("summary", null, title));
+    const ul = el("ul"); items.forEach(t => ul.appendChild(el("li", null, t))); d.appendChild(ul); notes.appendChild(d);
+  };
+  if (repoErrors.length) addNote(repoErrors.length + " repositor" + (repoErrors.length === 1 ? "y" : "ies") + " could not be fully read",
+    repoErrors.map(r => r.full_name + ": " + r.errors.join("; ")));
+  if ((DATA.warnings || []).length) addNote(DATA.warnings.length + " warning" + (DATA.warnings.length === 1 ? "" : "s"), DATA.warnings);
+}
+
+// ---------- filter state ----------
+const ALL = {
+  owners: [...owners.keys()].sort((a, b) => a.localeCompare(b)),
+  vis: ["public", "internal", "private", "unknown"].filter(v => visCounts.has(v)),
+  roles: [...ROLE_ORDER, "custom"].filter(r => roleCounts.has(r)),
+  via: VIA_ORDER.filter(v => viaCounts.has(v)),
+};
+const SHOW_OPTS = [
+  ["teams", "Team nodes", hasTeams], ["invites", "Pending invites", hasInvites],
+  ["archived", "Archived repos", hasArchived], ["bots", "Bot accounts", hasBots],
+  ["labels", "All labels", true],
+].filter(o => o[2]);
+function defaultState() {
+  return {
+    q: "", isolate: null,
+    owners: new Set(ALL.owners), vis: new Set(ALL.vis), roles: new Set(ALL.roles), via: new Set(ALL.via),
+    show: new Set(["teams", "invites", "archived", "bots"]),
+  };
+}
+let F = defaultState();
+
+// ---------- dropdowns ----------
+const COUNTS = { owners, vis: visCounts, roles: roleCounts, via: viaCounts };
+function ddLabel(key, v) {
+  if (key === "via") return VIA_LABEL[v] ? VIA_LABEL[v][0] : v;
+  if (key === "show") return (SHOW_OPTS.find(o => o[0] === v) || [, v])[1];
+  return v.charAt(0).toUpperCase() + v.slice(1);
+}
+function buildMenus() {
+  document.querySelectorAll(".dd").forEach(dd => {
+    const key = dd.dataset.key, menu = $(".dd-menu", dd);
+    menu.textContent = "";
+    const values = key === "show" ? SHOW_OPTS.map(o => o[0]) : ALL[key];
+    if (key !== "show" && values.length > 1) {
+      const q = el("div", "quick");
+      const a = el("button", null, "Select all"); a.type = "button";
+      const n = el("button", null, "Clear"); n.type = "button";
+      a.onclick = () => { F[key] = new Set(values); sync(); };
+      n.onclick = () => { F[key] = new Set(); sync(); };
+      q.append(a, n); menu.appendChild(q);
+    }
+    for (const v of values) {
+      const row = el("label", "row");
+      const cb = el("input"); cb.type = "checkbox"; cb.value = v; cb.checked = F[key].has(v);
+      cb.onchange = () => { cb.checked ? F[key].add(v) : F[key].delete(v); sync(); };
+      const txt = el("span"); txt.appendChild(el("span", null, ddLabel(key, v)));
+      if (key === "via" && VIA_LABEL[v]) { txt.appendChild(el("br")); txt.appendChild(el("span", "hint", VIA_LABEL[v][1])); }
+      row.append(cb, txt);
+      if (COUNTS[key]) row.appendChild(el("span", "n", String(COUNTS[key].get(v) || 0)));
+      menu.appendChild(row);
+    }
+  });
+}
+function syncMenus() {
+  document.querySelectorAll(".dd").forEach(dd => {
+    const key = dd.dataset.key;
+    const values = key === "show" ? SHOW_OPTS.map(o => o[0]) : ALL[key];
+    dd.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = F[key].has(cb.value));
+    const sel = values.filter(v => F[key].has(v));
+    let txt;
+    if (key === "show") txt = sel.length + "/" + values.length;
+    else if (sel.length === values.length) txt = "All";
+    else if (sel.length === 0) txt = "None";
+    else if (sel.length === 1) txt = ddLabel(key, sel[0]);
+    else txt = sel.length + " of " + values.length;
+    $(".v", dd).textContent = txt;
+    dd.classList.toggle("active", key !== "show" && sel.length !== values.length);
+  });
+  const chip = $("#isochip"); chip.textContent = "";
+  if (F.isolate && nodes.get(F.isolate)) {
+    const c = el("span", "chip"); c.appendChild(el("span", null, "Focused: " + nodes.get(F.isolate).label));
+    const x = el("button", null, "×"); x.type = "button"; x.setAttribute("aria-label", "Clear focus");
+    x.onclick = () => { F.isolate = null; sync(); }; c.appendChild(x); chip.appendChild(c);
+  }
+}
+document.addEventListener("click", e => {
+  document.querySelectorAll(".dd[open]").forEach(dd => { if (!dd.contains(e.target)) dd.open = false; });
+});
+document.querySelectorAll(".dd").forEach(dd => dd.addEventListener("toggle", () => {
+  if (dd.open) document.querySelectorAll(".dd[open]").forEach(o => { if (o !== dd) o.open = false; });
+}));
+let qTimer;
+$("#q").addEventListener("input", e => { clearTimeout(qTimer); qTimer = setTimeout(() => { F.q = e.target.value.trim().toLowerCase(); sync(); }, 150); });
+$("#reset").onclick = () => { F = defaultState(); $("#q").value = ""; selected = null; sync(); };
+
+// ---------- filtering ----------
+let vNodes = [], vEdges = [], adj = new Map();
+function repoOK(r) {
+  return F.owners.has(r.owner) && F.vis.has(r.visibility || "unknown") && (F.show.has("archived") || !r.archived);
+}
+function computeVisible() {
+  const base = [];
+  for (const e of edges) {
+    if (e.kind === "member") continue;
+    if (!repoOK(e.repo) || !F.roles.has(roleKey(e.role))) continue;
+    if (e.kind === "team" && !F.show.has("teams")) continue;
+    if (e.kind === "invite" && !F.show.has("invites")) continue;
+    if (e.kind !== "team" && e.s.utype === "Bot" && !F.show.has("bots")) continue;
+    let viaOK = false; for (const k of e.vk) if (F.via.has(k)) { viaOK = true; break; }
+    if (!viaOK) continue;
+    base.push(e);
+  }
+  // Team membership edges join visible users to visible teams.
+  const members = F.show.has("teams") ? edges.filter(e => e.kind === "member") : [];
+  let es = base;
+  const touch = (e, set) => set.has(e.s) || set.has(e.t);
+
+  if (F.isolate) {
+    const focus = nodes.get(F.isolate);
+    const keep = new Set([focus]);
+    es = base.filter(e => touch(e, keep));
+    // For a team, include its members; for a user, include their teams.
+    const extra = members.filter(e => e.s === focus || e.t === focus);
+    es = es.concat(extra);
+  }
+  if (F.q) {
+    const matched = new Set();
+    for (const e of es) { for (const n of [e.s, e.t]) if (n.lower.includes(F.q)) matched.add(n); }
+    for (const e of members) { for (const n of [e.s, e.t]) if (n.lower.includes(F.q)) matched.add(n); }
+    es = es.filter(e => touch(e, matched));
+    const extra = members.filter(e => (matched.has(e.s) || matched.has(e.t)) && !es.includes(e));
+    es = es.concat(extra);
+  }
+  const ns = new Set();
+  for (const e of es) { ns.add(e.s); ns.add(e.t); }
+  if (!F.isolate && !F.q) {
+    for (const e of members) if (ns.has(e.s) && ns.has(e.t)) es.push(e);
+  }
+  vEdges = es; vNodes = [...ns];
+  adj = new Map(vNodes.map(n => [n, []]));
+  for (const n of vNodes) n.deg = 0;
+  for (const e of vEdges) { e.s.deg++; e.t.deg++; adj.get(e.s).push(e); adj.get(e.t).push(e); }
+  vNodes.forEach((n, i) => n.idx = i);
+}
+
+// ---------- stats ----------
+function renderStats() {
+  const s = $("#stats"); s.textContent = "";
+  const repos = new Set(), users = new Set(), outside = new Set(), teams = new Set(); let admin = 0, grants = 0;
+  for (const e of vEdges) {
+    if (e.kind === "member") continue;
+    repos.add(e.t);
+    if (e.kind === "team") { teams.add(e.s); continue; }
+    users.add(e.s); grants++;
+    if (e.kind === "access" && e.role === "admin") admin++;
+    if (e.vk.has("outside-collaborator")) outside.add(e.s);
+  }
+  const items = [["Repositories", repos.size], ["Users", users.size], ["Outside collaborators", outside.size],
+                 ["Admin grants", admin], ["Teams", teams.size], ["User grants", grants]];
+  for (const [l, n] of items) {
+    const c = el("div", "stat"); c.append(el("div", "l", l), el("div", "n", n.toLocaleString())); s.appendChild(c);
+  }
+}
+
+// ---------- canvas & simulation ----------
+const cv = $("#cv"), ctx = cv.getContext("2d"), gbox = $("#graph");
+let W = 0, H = 0, DPR = 1;
+const view = { x: 0, y: 0, k: 1 };
+let alpha = 0, userMoved = false, needDraw = true, ticks = 0;
+let hover = null, selected = null;
+let C = {};
+function readColors() {
+  const cs = getComputedStyle(document.documentElement);
+  for (const k of ["surface", "ink", "ink-2", "muted", "grid", "repo", "user", "team", "accent"]) C[k] = cs.getPropertyValue("--" + k).trim();
+  needDraw = true;
+}
+function resize() {
+  const r = gbox.getBoundingClientRect();
+  DPR = window.devicePixelRatio || 1; W = r.width; H = r.height;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  needDraw = true;
+}
+new ResizeObserver(resize).observe(gbox);
+const mq = matchMedia("(prefers-color-scheme: dark)");
+mq.addEventListener && mq.addEventListener("change", readColors);
+new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class"] });
+
+function radius(n) {
+  if (n.kind === "repo") return 5 + Math.min(12, Math.sqrt(n.deg) * 1.4);
+  if (n.kind === "team") return 6 + Math.min(8, Math.sqrt(n.deg));
+  return 4 + Math.min(8, Math.sqrt(n.deg) * 1.1);
+}
+
+function seedPositions(all) {
+  const R = Math.sqrt(vNodes.length) * 22 + 40;
+  for (const n of vNodes) {
+    if (!all && !isNaN(n.x)) continue;
+    // Start new nodes near an already-placed neighbour when possible.
+    const nb = (adj.get(n) || []).map(e => e.s === n ? e.t : e.s).find(m => !isNaN(m.x));
+    if (nb && !all) { n.x = nb.x + (Math.random() - 0.5) * 40; n.y = nb.y + (Math.random() - 0.5) * 40; }
+    else { const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * R; n.x = Math.cos(a) * d; n.y = Math.sin(a) * d; }
+    n.vx = n.vy = 0;
+  }
+}
+
+function tick() {
+  const N = vNodes.length; if (!N) return;
+  const CELL = 160, CUT2 = CELL * CELL, STRENGTH = 90;
+  const grid = new Map();
+  for (const n of vNodes) {
+    const key = Math.floor(n.x / CELL) + "," + Math.floor(n.y / CELL);
+    let b = grid.get(key); if (!b) grid.set(key, b = []); b.push(n);
+  }
+  for (const a of vNodes) {
+    const cx = Math.floor(a.x / CELL), cy = Math.floor(a.y / CELL);
+    for (let ix = -1; ix <= 1; ix++) for (let iy = -1; iy <= 1; iy++) {
+      const b = grid.get((cx + ix) + "," + (cy + iy)); if (!b) continue;
+      for (const o of b) {
+        if (o.idx <= a.idx) continue;
+        let dx = a.x - o.x, dy = a.y - o.y, d2 = dx * dx + dy * dy;
+        if (d2 > CUT2) continue;
+        if (d2 < 1) { dx = Math.random() - 0.5; dy = Math.random() - 0.5; d2 = 1; }
+        const f = STRENGTH * alpha / d2;
+        a.vx += dx * f; a.vy += dy * f; o.vx -= dx * f; o.vy -= dy * f;
+      }
+    }
+  }
+  for (const e of vEdges) {
+    const s = e.s, t = e.t;
+    const L = e.kind === "member" ? 36 : 56 + (e.kind === "team" ? 10 : 0);
+    let dx = t.x - s.x, dy = t.y - s.y; const d = Math.sqrt(dx * dx + dy * dy) || 1;
+    const k = (d - L) / d * alpha * (e.kind === "member" ? 0.35 : 0.5) / Math.min(s.deg, t.deg);
+    const bs = t.deg / (s.deg + t.deg);
+    dx *= k; dy *= k;
+    s.vx += dx * bs; s.vy += dy * bs; t.vx -= dx * (1 - bs); t.vy -= dy * (1 - bs);
+  }
+  const G = 0.012 * alpha;
+  for (const n of vNodes) {
+    n.vx -= n.x * G; n.vy -= n.y * G;
+    if (n.fx != null) { n.x = n.fx; n.y = n.fy; n.vx = n.vy = 0; continue; }
+    n.vx *= 0.6; n.vy *= 0.6;
+    n.x += n.vx; n.y += n.vy;
+  }
+  alpha += (0 - alpha) * 0.02;
+  ticks++;
+}
+
+function fit(animate) {
+  if (!vNodes.length || !W) return;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const n of vNodes) { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x); y1 = Math.max(y1, n.y); }
+  const pad = 40, bw = Math.max(x1 - x0, 1), bh = Math.max(y1 - y0, 1);
+  const k = Math.max(0.03, Math.min(2.5, Math.min((W - pad * 2) / bw, (H - pad * 2 - 40) / bh)));
+  const tx = W / 2 - (x0 + bw / 2) * k, ty = (H - 40) / 2 - (y0 + bh / 2) * k;
+  if (animate) { view.k += (k - view.k) * 0.25; view.x += (tx - view.x) * 0.25; view.y += (ty - view.y) * 0.25; }
+  else { view.k = k; view.x = tx; view.y = ty; }
+  needDraw = true;
+}
+
+function focusSet() {
+  const f = hover || selected; if (!f || !adj.has(f)) return null;
+  const s = new Set([f]); for (const e of adj.get(f)) { s.add(e.s); s.add(e.t); }
+  return { node: f, set: s };
+}
+function nodeColor(n) { return n.kind === "repo" ? C.repo : n.kind === "team" ? C.team : C.user; }
+
+function drawShape(n, r) {
+  ctx.beginPath();
+  if (n.kind === "repo") {
+    const s = r * 0.9, rr = Math.min(3, s * 0.4);
+    ctx.roundRect ? ctx.roundRect(n.x - s, n.y - s, s * 2, s * 2, rr) : ctx.rect(n.x - s, n.y - s, s * 2, s * 2);
+  } else if (n.kind === "team") {
+    ctx.moveTo(n.x, n.y - r * 1.15); ctx.lineTo(n.x + r * 1.15, n.y); ctx.lineTo(n.x, n.y + r * 1.15); ctx.lineTo(n.x - r * 1.15, n.y); ctx.closePath();
+  } else {
+    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+  }
+}
+
+function draw() {
+  needDraw = false;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = C.surface; ctx.fillRect(0, 0, W, H);
+  $("#empty").style.display = vNodes.length ? "none" : "flex";
+  if (!vNodes.length) return;
+  ctx.translate(view.x, view.y); ctx.scale(view.k, view.k);
+  const k = view.k, fs = focusSet();
+
+  // edges — neutral ink; weight + opacity encode role
+  ctx.lineCap = "round";
+  for (const pass of [0, 1]) {
+    for (const e of vEdges) {
+      const lit = fs && (e.s === fs.node || e.t === fs.node);
+      if ((pass === 1) !== !!lit) continue;
+      let w, a;
+      if (e.kind === "member") { w = 0.8; a = 0.30; }
+      else { [w, a] = ROLE_STYLE[roleKey(e.role)]; }
+      if (fs) a = lit ? Math.min(1, a + 0.35) : a * 0.15;
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = lit ? C.ink : C["ink-2"];
+      ctx.lineWidth = (lit ? w + 0.6 : w) / k;
+      ctx.setLineDash(e.kind === "member" ? [2 / k, 3 / k] : e.kind === "invite" ? [5 / k, 4 / k] : []);
+      ctx.beginPath(); ctx.moveTo(e.s.x, e.s.y); ctx.lineTo(e.t.x, e.t.y); ctx.stroke();
+    }
+  }
+  ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+  // nodes
+  const minR = 2.5 / k;
+  for (const n of vNodes) {
+    const r = Math.max(radius(n), minR);
+    const dim = fs && !fs.set.has(n);
+    ctx.globalAlpha = dim ? 0.18 : 1;
+    drawShape(n, r);
+    const hollow = n.kind === "user" && n.invited && !n.hasAccess;
+    ctx.lineWidth = 2 / k; ctx.strokeStyle = C.surface;
+    if (hollow) { ctx.fillStyle = C.surface; ctx.fill(); ctx.strokeStyle = C.user; ctx.lineWidth = 2 / k; ctx.stroke(); }
+    else { ctx.fillStyle = nodeColor(n); ctx.fill(); ctx.stroke(); }
+    if (n.kind === "user" && n.outside) {
+      ctx.beginPath(); ctx.arc(n.x, n.y, r + 3 / k, 0, Math.PI * 2);
+      ctx.setLineDash([2.5 / k, 2 / k]); ctx.strokeStyle = C.ink; ctx.lineWidth = 1.2 / k; ctx.stroke(); ctx.setLineDash([]);
+    }
+    if (n === selected || n === hover) {
+      ctx.beginPath(); ctx.arc(n.x, n.y, r + 5 / k, 0, Math.PI * 2);
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5 / k; ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // labels — selective: focus neighbourhood, big hubs, or everything when zoomed in
+  const showAll = F.show.has("labels");
+  const hubCut = topDegreeCut();
+  ctx.font = `${12 / k}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+  ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+  for (const n of vNodes) {
+    let show;
+    if (fs) show = fs.set.has(n);
+    else show = showAll || (n.kind !== "user" && k > 1.1) || k > 1.8 || n.deg >= hubCut;
+    if (!show) continue;
+    const r = Math.max(radius(n), minR);
+    const label = n.kind === "repo" && owners.size === 1 ? n.label.split("/").slice(1).join("/") : n.label;
+    const x = n.x + r + 4 / k;
+    ctx.lineWidth = 3 / k; ctx.strokeStyle = C.surface; ctx.strokeText(label, x, n.y);
+    ctx.fillStyle = fs && n === fs.node ? C.ink : C["ink-2"]; ctx.fillText(label, x, n.y);
+  }
+}
+let _hubCache = null;
+function topDegreeCut() {
+  if (_hubCache && _hubCache.n === vNodes) return _hubCache.v;
+  const d = vNodes.map(n => n.deg).sort((a, b) => b - a);
+  const v = d.length > 40 ? Math.max(3, d[11]) : 0;
+  _hubCache = { n: vNodes, v }; return v;
+}
+
+// Run the simulation synchronously (time-boxed) so the first paint is settled.
+function settle(budgetMs, minAlpha) {
+  const t0 = performance.now();
+  while (alpha > minAlpha && performance.now() - t0 < budgetMs) tick();
+}
+function loop() {
+  if (alpha > 0.004) {
+    const steps = vNodes.length > 3000 ? 1 : 2;
+    for (let i = 0; i < steps; i++) tick();
+    if (!userMoved && ticks % 6 === 0) fit(true);
+    if (!userMoved && alpha <= 0.004) fit(false);
+    needDraw = true;
+  }
+  if (needDraw) draw();
+  requestAnimationFrame(loop);
+}
+
+// ---------- interaction ----------
+const toWorld = (sx, sy) => [(sx - view.x) / view.k, (sy - view.y) / view.k];
+function pick(sx, sy) {
+  const [wx, wy] = toWorld(sx, sy);
+  let best = null, bd = Infinity;
+  for (const n of vNodes) {
+    const r = Math.max(radius(n), 2.5 / view.k) + 8 / view.k; // hit target larger than mark
+    const dx = n.x - wx, dy = n.y - wy, d = dx * dx + dy * dy;
+    if (d < r * r && d < bd) { bd = d; best = n; }
+  }
+  return best;
+}
+let drag = null;
+cv.addEventListener("pointerdown", e => {
+  const r = cv.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top;
+  const n = pick(sx, sy);
+  cv.setPointerCapture(e.pointerId);
+  drag = { n, sx, sy, vx: view.x, vy: view.y, moved: false };
+  if (n) { n.fx = n.x; n.fy = n.y; }
+  cv.classList.add("dragging");
+});
+cv.addEventListener("pointermove", e => {
+  const r = cv.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top;
+  if (drag) {
+    if (Math.abs(sx - drag.sx) + Math.abs(sy - drag.sy) > 3) drag.moved = true;
+    if (drag.n) {
+      const [wx, wy] = toWorld(sx, sy); drag.n.fx = wx; drag.n.fy = wy; drag.n.x = wx; drag.n.y = wy;
+      if (drag.moved) alpha = Math.max(alpha, 0.08);
+    } else if (drag.moved) { view.x = drag.vx + sx - drag.sx; view.y = drag.vy + sy - drag.sy; userMoved = true; }
+    hideTip(); needDraw = true; return;
+  }
+  const n = pick(sx, sy);
+  if (n !== hover) { hover = n; needDraw = true; }
+  cv.classList.toggle("over", !!n);
+  n ? showTip(n, e.clientX, e.clientY) : hideTip();
+});
+cv.addEventListener("pointerup", e => {
+  cv.classList.remove("dragging");
+  if (!drag) return;
+  if (drag.n) { drag.n.fx = drag.n.fy = null; }
+  if (!drag.moved) { selected = drag.n || null; renderPanel(); }
+  drag = null; needDraw = true;
+});
+cv.addEventListener("pointerleave", () => { if (!drag) { hover = null; hideTip(); needDraw = true; } });
+cv.addEventListener("dblclick", e => {
+  const r = cv.getBoundingClientRect(); const n = pick(e.clientX - r.left, e.clientY - r.top);
+  if (n) { F.isolate = n.id; selected = n; sync(); }
+});
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  const r = cv.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top;
+  zoomAt(sx, sy, Math.exp(-e.deltaY * 0.0015));
+}, { passive: false });
+function zoomAt(sx, sy, f) {
+  const k = Math.max(0.02, Math.min(8, view.k * f));
+  view.x = sx - (sx - view.x) * (k / view.k); view.y = sy - (sy - view.y) * (k / view.k); view.k = k;
+  userMoved = true; needDraw = true;
+}
+$("#zin").onclick = () => zoomAt(W / 2, H / 2, 1.3);
+$("#zout").onclick = () => zoomAt(W / 2, H / 2, 1 / 1.3);
+$("#fit").onclick = () => { fit(false); };
+$("#relayout").onclick = () => { seedPositions(true); alpha = 1; ticks = 0; userMoved = false; };
+
+const tip = $("#tip");
+function tipRow(label, value) { const r = el("div", "r"); r.append(el("span", "s", label), el("b", null, String(value))); return r; }
+function summarize(n) {
+  const es = adj.get(n) || [];
+  const out = { repos: 0, users: 0, teams: 0, admin: 0, invites: 0 };
+  for (const e of es) {
+    const o = e.s === n ? e.t : e.s;
+    if (e.kind === "invite") out.invites++;
+    if (o.kind === "repo") out.repos++; else if (o.kind === "team") out.teams++; else out.users++;
+    if (e.role === "admin") out.admin++;
+  }
+  return out;
+}
+function showTip(n, x, y) {
+  tip.textContent = "";
+  tip.appendChild(el("div", "t", n.label));
+  const s = summarize(n);
+  if (n.kind === "repo") {
+    const r = n.repo;
+    tip.appendChild(el("div", "s", [r.visibility, r.archived ? "archived" : "", r.fork ? "fork" : ""].filter(Boolean).join(" · ")));
+    tip.append(tipRow("Users", s.users), tipRow("Teams", s.teams), tipRow("Admins", s.admin));
+    if (s.invites) tip.appendChild(tipRow("Pending invites", s.invites));
+  } else if (n.kind === "team") {
+    tip.appendChild(el("div", "s", "Team"));
+    tip.append(tipRow("Repositories", s.repos), tipRow("Members shown", s.users));
+  } else {
+    const tags = [n.utype || "User"]; if (n.outside) tags.push("outside collaborator"); if (n.invited) tags.push("has pending invite");
+    tip.appendChild(el("div", "s", tags.join(" · ")));
+    tip.append(tipRow("Repositories", s.repos), tipRow("Admin on", s.admin));
+    if (s.teams) tip.appendChild(tipRow("Teams", s.teams));
+  }
+  tip.style.display = "block";
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  tip.style.left = Math.min(x + 14, innerWidth - tw - 8) + "px";
+  tip.style.top = Math.min(y + 14, innerHeight - th - 8) + "px";
+}
+function hideTip() { tip.style.display = "none"; }
+
+// ---------- legend ----------
+function renderLegend() {
+  const lg = $("#legend"); lg.textContent = "";
+  const ns = "http://www.w3.org/2000/svg";
+  const item = (svgInner, text) => {
+    const it = el("span", "it");
+    const svg = document.createElementNS(ns, "svg"); svg.setAttribute("width", "22"); svg.setAttribute("height", "14");
+    svg.innerHTML = svgInner; // static markup only
+    it.append(svg, el("span", null, text)); lg.appendChild(it);
+  };
+  item('<rect x="5" y="1" width="12" height="12" rx="3" fill="var(--repo)"/>', "Repository");
+  item('<circle cx="11" cy="7" r="6" fill="var(--user)"/>', "User");
+  item('<circle cx="11" cy="7" r="4.5" fill="var(--user)"/><circle cx="11" cy="7" r="6.5" fill="none" stroke="var(--ink)" stroke-width="1.2" stroke-dasharray="2.5 2"/>', "Outside collaborator");
+  if (hasTeams) item('<path d="M11 0 L18 7 L11 14 L4 7 Z" fill="var(--team)"/>', "Team");
+  for (const r of ["admin", "write", "read"]) {
+    const [w, a] = ROLE_STYLE[r];
+    item(`<line x1="1" y1="7" x2="21" y2="7" stroke="var(--ink-2)" stroke-opacity="${a + 0.15}" stroke-width="${w + 0.4}" stroke-linecap="round"/>`, r);
+  }
+  if (hasTeams) item('<line x1="1" y1="7" x2="21" y2="7" stroke="var(--ink-2)" stroke-width="1" stroke-dasharray="2 3"/>', "team member");
+  if (hasInvites) item('<line x1="1" y1="7" x2="21" y2="7" stroke="var(--ink-2)" stroke-width="1.2" stroke-dasharray="5 4"/>', "invite");
+}
+
+// ---------- side panel ----------
+function renderPanel() {
+  const p = $("#panel"); p.textContent = "";
+  const n = selected && adj.has(selected) ? selected : null;
+  if (!n) {
+    const ph = el("div", "placeholder");
+    ph.appendChild(el("h2", null, "Explore access"));
+    for (const t of [
+      "Click a repository, user or team to see exactly who has access and why.",
+      "Double-click a node to focus the graph on its neighbourhood.",
+      "Drag nodes to untangle, drag the background to pan, scroll to zoom.",
+      "Tip: untick “Org owner” under Access via to hide owners, who implicitly reach every repo.",
+    ]) ph.appendChild(el("p", null, t));
+    p.appendChild(ph); return;
+  }
+  p.appendChild(el("h2", null, n.label));
+  const sub = el("div", "sub");
+  const dot = el("span", "dot"); dot.style.background = `var(--${n.kind})`;
+  const kindTag = el("span", "tag"); kindTag.append(dot, el("span", null, n.kind === "user" ? (n.utype || "User") : n.kind === "repo" ? "Repository" : "Team"));
+  sub.appendChild(kindTag);
+  if (n.kind === "repo") {
+    sub.appendChild(el("span", "tag", n.repo.visibility));
+    if (n.repo.archived) sub.appendChild(el("span", "tag", "archived"));
+    if (n.repo.fork) sub.appendChild(el("span", "tag", "fork"));
+  }
+  if (n.outside) sub.appendChild(el("span", "tag", "outside collaborator"));
+  if (n.invited) sub.appendChild(el("span", "tag", "pending invite"));
+  p.appendChild(sub);
+
+  const actions = el("div", "actions");
+  const iso = el("button", "btn", F.isolate === n.id ? "Unfocus" : "Focus graph"); iso.type = "button";
+  iso.onclick = () => { F.isolate = F.isolate === n.id ? null : n.id; sync(); };
+  actions.appendChild(iso);
+  const href = n.kind === "repo" ? (n.repo.url || webBase + "/" + n.label)
+    : n.kind === "team" ? webBase + "/orgs/" + n.org + "/teams/" + n.team.slug : webBase + "/" + n.label;
+  const a = el("a", "btn", "Open on GitHub ↗"); a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer";
+  actions.appendChild(a);
+  p.appendChild(actions);
+
+  if (n.kind === "repo" && n.repo.errors && n.repo.errors.length) {
+    p.appendChild(el("h3", null, "Errors"));
+    n.repo.errors.forEach(t => p.appendChild(el("div", "via", t)));
+  }
+
+  const groups = new Map();
+  for (const e of adj.get(n)) {
+    const o = e.s === n ? e.t : e.s;
+    const g = e.kind === "member" ? (o.kind === "team" ? "Teams" : "Members")
+      : e.kind === "invite" ? "Pending invitations" : o.kind === "repo" ? "Repositories" : o.kind === "team" ? "Teams" : "Users";
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push({ e, o });
+  }
+  const order = ["Users", "Teams", "Members", "Repositories", "Pending invitations"];
+  for (const g of order) {
+    const list = groups.get(g); if (!list) continue;
+    list.sort((a, b) => roleRank(a.e.role || "zz") - roleRank(b.e.role || "zz") || a.o.label.localeCompare(b.o.label));
+    p.appendChild(el("h3", null, `${g} (${list.length})`));
+    for (const { e, o } of list) {
+      const row = el("div", "conn");
+      const who = el("span", "who"); const d = el("span", "dot"); d.style.background = `var(--${o.kind})`;
+      who.append(d, el("span", null, o.label));
+      row.append(who, el("span", "role", e.role || "member"));
+      const via = e.kind === "member" ? "team membership" : e.kind === "team" ? "team grant" : e.via.map(prettyVia).join(" · ");
+      if (via) row.appendChild(el("span", "via", via));
+      row.onclick = () => { selected = o; renderPanel(); needDraw = true; };
+      p.appendChild(row);
+    }
+  }
+}
+function prettyVia(v) {
+  if (v.startsWith("team:")) return "team " + v.slice(5);
+  const k = v.split(" ")[0];
+  return VIA_LABEL[k] ? VIA_LABEL[k][0] + v.slice(k.length) : v;
+}
+
+// ---------- table ----------
+let sortKey = "repo", sortDir = 1, tableRows = [];
+const TABLE_CAP = 1000;
+function rowsFor() {
+  const rows = [];
+  for (const e of vEdges) {
+    if (e.kind === "member") continue;
+    rows.push({
+      repo: e.repo.full_name, principal: e.s.label,
+      ptype: e.kind === "team" ? "Team" : e.kind === "invite" ? "Invitation" : (e.s.utype || "User"),
+      role: e.role || "", via: e.kind === "team" ? "team grant" : e.via.map(prettyVia).join("; "),
+      vis: e.repo.visibility + (e.repo.archived ? " (archived)" : ""), node: e.s, rnode: e.t,
+    });
+  }
+  return rows;
+}
+function renderTable() {
+  tableRows = rowsFor();
+  const cmp = sortKey === "role" ? (a, b) => roleRank(a.role) - roleRank(b.role) : (a, b) => a[sortKey].localeCompare(b[sortKey]);
+  tableRows.sort((a, b) => sortDir * cmp(a, b) || a.repo.localeCompare(b.repo) || a.principal.localeCompare(b.principal));
+  const tb = $("#tbody"); tb.textContent = "";
+  const frag = document.createDocumentFragment();
+  for (const r of tableRows.slice(0, TABLE_CAP)) {
+    const tr = el("tr");
+    tr.append(el("td", null, r.repo), el("td", null, r.principal), el("td", null, r.ptype), el("td", "role", r.role), el("td", null, r.via), el("td", null, r.vis));
+    tr.onclick = () => { selected = r.node; renderPanel(); needDraw = true; };
+    frag.appendChild(tr);
+  }
+  tb.appendChild(frag);
+  $("#tcount").textContent = tableRows.length > TABLE_CAP
+    ? `showing first ${TABLE_CAP.toLocaleString()} of ${tableRows.length.toLocaleString()} rows (CSV has all)`
+    : `${tableRows.length.toLocaleString()} rows`;
+  document.querySelectorAll("th[data-sort]").forEach(th => {
+    th.textContent = th.textContent.replace(/ [▲▼]$/, "") + (th.dataset.sort === sortKey ? (sortDir > 0 ? " ▲" : " ▼") : "");
+  });
+}
+document.querySelectorAll("th[data-sort]").forEach(th => th.onclick = () => {
+  const k = th.dataset.sort; sortDir = k === sortKey ? -sortDir : 1; sortKey = k; renderTable();
+});
+$("#csv").onclick = () => {
+  const esc = v => /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  const lines = [["repository", "principal", "type", "role", "access_via", "visibility"].join(",")];
+  for (const r of tableRows) lines.push([r.repo, r.principal, r.ptype, r.role, r.via, r.vis].map(esc).join(","));
+  const blob = new Blob([lines.join("\n") + "\n"], { type: "text/csv" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "github-access.csv";
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+// ---------- orchestration ----------
+function sync() {
+  syncMenus();
+  const before = new Set(vNodes);
+  computeVisible();
+  const added = vNodes.filter(n => !before.has(n)).length;
+  seedPositions(false);
+  if (selected && !adj.has(selected)) selected = null;
+  alpha = Math.max(alpha, added > 0 || vNodes.length !== before.size ? 0.6 : 0.1);
+  if (added > vNodes.length * 0.3) {
+    userMoved = false; ticks = 0;
+    settle(250, 0.05); fit(false);
+  }
+  renderStats(); renderTable(); renderPanel(); renderLegend();
+  needDraw = true;
+}
+
+readColors();
+buildMenus();
+resize();
+alpha = 1;
+sync();
+settle(700, 0.02);
+fit(false);
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
